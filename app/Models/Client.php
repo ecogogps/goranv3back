@@ -16,9 +16,6 @@ class Client extends Model
         'status',
     ];
 
-    /**
-     * Get the user that owns the client.
-     */
     public function user()
     {
         return $this->belongsTo(User::class);
