@@ -51,7 +51,6 @@ class TournamentController extends Controller
             'age_to' => 'nullable|integer',
             'gender' => 'required|string',
             'affects_ranking' => 'required|boolean',
-            'draw_for_serve' => 'required|boolean',
             'system_invitation' => 'required|boolean',
             'resend_invitation_schedule' => 'nullable|string',
             'main_image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048', 
@@ -65,7 +64,12 @@ class TournamentController extends Controller
             'ball_info' => 'required|string',
             
             'advancers_per_group' => 'nullable|integer|min:1',
-            'elimination_rounds' => 'nullable|integer|min:1',
+
+            // nuevos campos
+            'tournament_price' => 'nullable|numeric|min:0',
+            'rubber_type' => 'nullable|in:Liso,Pupo,Todos',
+            'groups_number' => 'nullable|integer|min:1',
+            'rounds' => 'nullable|integer|min:1',
         ]);
 
         if ($validator->fails()) {
@@ -87,10 +91,6 @@ class TournamentController extends Controller
         
         if (!isset($tournamentData['advancers_per_group']) || $tournamentData['advancers_per_group'] === null) {
             $tournamentData['advancers_per_group'] = 2;
-        }
-        
-        if (!isset($tournamentData['elimination_rounds']) || $tournamentData['elimination_rounds'] === null) {
-            $tournamentData['elimination_rounds'] = 1;
         }
 
         $tournament = Tournament::create($tournamentData);

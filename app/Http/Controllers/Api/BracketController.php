@@ -27,7 +27,47 @@ class BracketController extends Controller
         
         
         $advancersPerGroup = (int)$request->query('advancers_per_group', 2);
-        $eliminationRounds = (int)$request->query('elimination_rounds', 1);
+        $groupsNumber = (int)$request->query('groups_number', 4);
+        $rounds = (int)$request->query('rounds', 1);
+
+        
+        if ($eliminationType === 'groups') {
+            
+            if ($participantsNumber < $groupsNumber * 2) {
+                return response()->json([
+                    'message' => "Se necesitan al menos " . ($groupsNumber * 2) . " participantes para crear {$groupsNumber} grupos con mínimo 2 participantes por grupo. Participantes disponibles: {$participantsNumber}."
+                ], 400);
+            }
+
+            
+            $participantsPerGroup = floor($participantsNumber / $groupsNumber);
+            if ($advancersPerGroup >= $participantsPerGroup) {
+                return response()->json([
+                    'message' => "El número de clasificados por grupo ({$advancersPerGroup}) debe ser menor al número de participantes por grupo ({$participantsPerGroup})."
+                ], 400);
+            }
+
+            
+            $totalAdvancers = $groupsNumber * $advancersPerGroup;
+            if ($totalAdvancers < 2) {
+                return response()->json([
+                    'message' => "Se necesitan al menos 2 clasificados totales para la fase eliminatoria. Actualmente: {$totalAdvancers} clasificados."
+                ], 400);
+            }
+
+            
+            if ($groupsNumber < 2) {
+                return response()->json(['message' => 'Se necesitan al menos 2 grupos para el formato de eliminación por grupos.'], 400);
+            }
+
+            if ($rounds < 1 || $rounds > 2) {
+                return response()->json(['message' => 'El número de vueltas debe ser 1 (ida) o 2 (ida y vuelta).'], 400);
+            }
+
+            if ($advancersPerGroup < 1) {
+                return response()->json(['message' => 'Debe clasificar al menos 1 participante por grupo.'], 400);
+            }
+        }
 
         
         $sortedParticipants = $this->sortParticipants($participants, $seedingType);
@@ -39,7 +79,8 @@ class BracketController extends Controller
             $eliminationType, 
             $participantsNumber,
             $advancersPerGroup,
-            $eliminationRounds
+            $groupsNumber,
+            $rounds
         );
         
         
@@ -71,14 +112,14 @@ class BracketController extends Controller
     {
         $allGames = $tournament->games()->with('member1', 'member2')->get();
 
-        // 1. Verificar si todos los partidos han terminado.
+        
         $allGamesCompleted = $allGames->every(fn($game) => $game->status === 'completed');
 
         if (!$allGamesCompleted) {
             return response()->json(['message' => 'El torneo aún no ha finalizado. Complete todos los partidos para ver la tabla de posiciones.'], 400);
         }
 
-        // 2. Calcular la tabla de posiciones
+        
         $standings = [];
         $allGames->pluck('member1')->merge($allGames->pluck('member2'))->unique('id')->filter()->each(function ($member) use (&$standings) {
             $standings[$member->id] = [
@@ -174,13 +215,14 @@ class BracketController extends Controller
         string $eliminationType, 
         int $participantsNumber,
         int $advancersPerGroup = 2,
-        int $eliminationRounds = 1
+        int $groupsNumber = 4,
+        int $rounds = 1
     ): array {
         return match ($eliminationType) {
             'direct' => $this->createDirectEliminationGames($participants, $tournamentId),
-            'groups' => $this->createGroupPlayoffGames($participants, $tournamentId, $participantsNumber, $advancersPerGroup, $eliminationRounds),
+            'groups' => $this->createGroupPlayoffGames($participants, $tournamentId, $participantsNumber, $advancersPerGroup, $groupsNumber, $rounds),
             'round_robin' => $this->createRoundRobinGames($participants, $tournamentId),
-            'mixed' => $this->createGroupPlayoffGames($participants, $tournamentId, $participantsNumber, $advancersPerGroup, $eliminationRounds),
+            'mixed' => $this->createGroupPlayoffGames($participants, $tournamentId, $participantsNumber, $advancersPerGroup, $groupsNumber, $rounds),
             default => [],
         };
     }
@@ -259,36 +301,46 @@ class BracketController extends Controller
         int $tournamentId, 
         int $participantsNumber,
         int $advancersPerGroup,
-        int $eliminationRounds
+        int $groupsNumber,
+        int $rounds
     ): array {
-        $numGroups = max(1, floor($participantsNumber / 4));
-        $groups = array_fill(0, $numGroups, []);
         $participantsArray = $participants->values()->all();
         $numParticipants = $participants->count();
-
+        
+        
         $participantsToDistribute = min($numParticipants, $participantsNumber);
-
+        
+        
+        $groups = array_fill(0, $groupsNumber, []);
+        
+        
         for ($i = 0; $i < $participantsToDistribute; $i++) {
-            $groupIndex = $i % $numGroups;
-            $round = floor($i / $numGroups);
+            $groupIndex = $i % $groupsNumber;
+            $round = floor($i / $groupsNumber);
 
             if ($round % 2 != 0) {
-                $groupIndex = $numGroups - 1 - $groupIndex;
+                $groupIndex = $groupsNumber - 1 - $groupIndex;
             }
             $groups[$groupIndex][] = $participantsArray[$i];
         }
 
         $allGames = [];
         
+        
         foreach ($groups as $index => $groupParticipants) {
             if (count($groupParticipants) > 1) {
                 $groupName = 'Grupo ' . chr(65 + $index);
-                $groupGames = $this->createRoundRobinGames(collect($groupParticipants), $tournamentId, $groupName);
+                $groupGames = $this->createRoundRobinGames(collect($groupParticipants), $tournamentId, $groupName, $rounds);
                 $allGames = array_merge($allGames, $groupGames);
             }
         }
         
-        $this->createEliminationPhaseStructure($tournamentId, $numGroups, $advancersPerGroup, $eliminationRounds, $allGames);
+        
+        $totalAdvancers = $groupsNumber * $advancersPerGroup;
+        $eliminationRounds = $totalAdvancers > 1 ? ceil(log($totalAdvancers, 2)) : 0;
+        
+        
+        $this->createEliminationPhaseStructure($tournamentId, $groupsNumber, $advancersPerGroup, $eliminationRounds, $allGames);
         
         return $allGames;
     }
@@ -371,7 +423,7 @@ class BracketController extends Controller
                     ];
                 }
             } else {
-                // Un solo clasificado por grupo
+                
                 $group1 = $gameNum * 2;
                 $group2 = $group1 + 1;
                 
@@ -382,7 +434,7 @@ class BracketController extends Controller
                 ];
             }
         } else {
-            // Rondas siguientes: ganadores de partidos anteriores
+            
             $prevGame1 = $gameNum * 2;
             $prevGame2 = $prevGame1 + 1;
             
@@ -408,7 +460,7 @@ class BracketController extends Controller
         };
     }
 
-    private function createRoundRobinGames(Collection $participants, int $tournamentId, ?string $groupName = null): array
+    private function createRoundRobinGames(Collection $participants, int $tournamentId, ?string $groupName = null, int $rounds = 1): array
     {
         $games = [];
         $players = $participants->values()->all();
@@ -421,31 +473,39 @@ class BracketController extends Controller
         $numRounds = count($players) - 1;
         $numPlayers = count($players);
         
-        for ($round = 0; $round < $numRounds; $round++) {
-            for ($i = 0; $i < $numPlayers / 2; $i++) {
-                $player1 = $players[$i];
-                $player2 = $players[$numPlayers - 1 - $i];
-                
-                if ($player1 && $player2) {
-                    $games[] = [
-                        'tournament_id' => $tournamentId,
-                        'round' => $groupName ? null : $round + 1,
-                        'group_name' => $groupName,
-                        'member1_id' => $player1->id,
-                        'member2_id' => $player2->id,
-                        'status' => 'pending',
-                        'points_member1' => null,
-                        'points_member2' => null,
-                        'elimination_game_id' => null,
-                        'pairing_info' => null,
-                        'created_at' => now()->toDateTimeString(),
-                        'updated_at' => now()->toDateTimeString(),
-                    ];
+        
+        for ($vuelta = 1; $vuelta <= $rounds; $vuelta++) {
+            for ($round = 0; $round < $numRounds; $round++) {
+                for ($i = 0; $i < $numPlayers / 2; $i++) {
+                    $player1 = $players[$i];
+                    $player2 = $players[$numPlayers - 1 - $i];
+                    
+                    if ($player1 && $player2) {
+                        
+                        if ($vuelta == 2) {
+                            [$player1, $player2] = [$player2, $player1];
+                        }
+                        
+                        $games[] = [
+                            'tournament_id' => $tournamentId,
+                            'round' => $groupName ? null : (($vuelta - 1) * $numRounds + $round + 1),
+                            'group_name' => $groupName,
+                            'member1_id' => $player1->id,
+                            'member2_id' => $player2->id,
+                            'status' => 'pending',
+                            'points_member1' => null,
+                            'points_member2' => null,
+                            'elimination_game_id' => null,
+                            'pairing_info' => $rounds > 1 ? json_encode(['vuelta' => $vuelta]) : null,
+                            'created_at' => now()->toDateTimeString(),
+                            'updated_at' => now()->toDateTimeString(),
+                        ];
+                    }
                 }
+                
+                $lastPlayer = array_pop($players);
+                array_splice($players, 1, 0, [$lastPlayer]);
             }
-            
-            $lastPlayer = array_pop($players);
-            array_splice($players, 1, 0, [$lastPlayer]);
         }
         
         return $games;
@@ -453,17 +513,17 @@ class BracketController extends Controller
 
     public static function placeAdvancersInElimination(int $tournamentId, string $groupName, int $advancersPerGroup)
     {
-        // Obtener todos los partidos de este grupo
+        
         $groupGames = Game::where('tournament_id', $tournamentId)
                             ->where('group_name', $groupName)
                             ->get();
 
-        // 1. Asegurarse de que todos los partidos del grupo están completos
+        
         if ($groupGames->count() === 0 || !$groupGames->every(fn($game) => $game->status === 'completed')) {
             return; 
         }
 
-        // 2. Calcular posiciones del grupo
+        
         $standings = [];
         $groupGames->pluck('member1_id')->merge($groupGames->pluck('member2_id'))->unique()->filter()->each(function ($memberId) use (&$standings) {
             $standings[$memberId] = ['points' => 0, 'wins' => 0, 'member_id' => $memberId];
@@ -487,13 +547,13 @@ class BracketController extends Controller
 
         $advancingMembers = collect($standings)->slice(0, $advancersPerGroup);
         
-        // 3. Obtener información del grupo (A=0, B=1, etc.)
+        
         $groupIndex = ord(substr($groupName, -1)) - ord('A');
         
-        // 4. Asignar a partidos específicos según pairing_info
+        
         foreach ($advancingMembers as $position => $memberData) {
             $memberId = $memberData['member_id'];
-            $positionInGroup = $position + 1; // 1° lugar, 2° lugar, etc.
+            $positionInGroup = $position + 1; 
             
             
             $eliminationGames = Game::where('tournament_id', $tournamentId)
