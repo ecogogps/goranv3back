@@ -5,6 +5,9 @@ use App\Http\Controllers\TournamentController;
 use App\Http\Controllers\Api\BracketController;
 use App\Http\Controllers\Api\MemberController;
 use App\Http\Controllers\Api\GameController;
+use App\Http\Controllers\Api\ClubController;
+
+Route::apiResource('clubs', ClubController::class);
 
 Route::post('/tournaments', [TournamentController::class, 'store']);
 
@@ -18,7 +21,7 @@ Route::get('/tournaments/{tournament}/bracket', [BracketController::class, 'getB
 
 Route::get('/tournaments/{tournament}/standings', [BracketController::class, 'getStandings']); 
 
-Route::get('/members', [MemberController::class, 'index']);
+Route::apiResource('members', MemberController::class);
 
 Route::get('/tournaments/{tournament}/members', [TournamentController::class, 'showMembers']);
 

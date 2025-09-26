@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Tournament;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 class TournamentController extends Controller
@@ -12,6 +13,17 @@ class TournamentController extends Controller
     public function index()
     {
         $tournaments = Tournament::withCount('games')->get(); 
+        
+        // Transformar la ruta relativa de la imagen en URL completa
+        $tournaments->transform(function ($tournament) {
+            if ($tournament->main_image_path) {
+                $tournament->main_image_url = 'https://00591b4e804e.ngrok-free.app' . Storage::url($tournament->main_image_path);
+            } else {
+                $tournament->main_image_url = null;
+            }
+            return $tournament;
+        });
+        
         return response()->json($tournaments, 200); 
     }
     

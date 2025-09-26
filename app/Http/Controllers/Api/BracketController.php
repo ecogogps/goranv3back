@@ -100,7 +100,25 @@ class BracketController extends Controller
     public function getBracket(Tournament $tournament)
     {
         
-        $games = $tournament->games()->with('member1', 'member2')->get();
+        $games = $tournament->games()->with('member1.club', 'member2.club')->get();
+        
+        // Transformar los datos para incluir las URLs de las imágenes de los clubes
+        $games->transform(function ($game) {
+            if ($game->member1 && $game->member1->club && $game->member1->club->imagen) {
+                $game->member1->club->imagen_url = 'https://00591b4e804e.ngrok-free.app/storage/' . $game->member1->club->imagen;
+            } else if ($game->member1 && $game->member1->club) {
+                $game->member1->club->imagen_url = null;
+            }
+            
+            if ($game->member2 && $game->member2->club && $game->member2->club->imagen) {
+                $game->member2->club->imagen_url = 'https://00591b4e804e.ngrok-free.app/storage/' . $game->member2->club->imagen;
+            } else if ($game->member2 && $game->member2->club) {
+                $game->member2->club->imagen_url = null;
+            }
+            
+            return $game;
+        });
+        
         return response()->json($games);
     }
     
@@ -110,7 +128,7 @@ class BracketController extends Controller
      */
     public function getStandings(Tournament $tournament)
     {
-        $allGames = $tournament->games()->with('member1', 'member2')->get();
+        $allGames = $tournament->games()->with('member1.club', 'member2.club')->get();
 
         
         $allGamesCompleted = $allGames->every(fn($game) => $game->status === 'completed');
@@ -130,7 +148,12 @@ class BracketController extends Controller
                 'wins' => 0,
                 'draws' => 0, 
                 'losses' => 0,
-                'games_played' => 0
+                'games_played' => 0,
+                'club' => $member->club ? [
+                    'id' => $member->club->id,
+                    'nombre' => $member->club->nombre,
+                    'imagen_url' => $member->club->imagen ? 'https://00591b4e804e.ngrok-free.app/storage/' . $member->club->imagen : null
+                ] : null
             ];
         });
 
@@ -170,8 +193,7 @@ class BracketController extends Controller
         return response()->json(array_values($standings));
     }
 
-
-    
+    // ... resto de métodos privados sin cambios ...
 
     private function sortParticipants(Collection $participants, string $seedingType): Collection
     {

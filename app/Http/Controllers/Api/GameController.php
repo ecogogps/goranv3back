@@ -106,7 +106,7 @@ class GameController extends Controller
             }
             
             
-            $response = $game->fresh()->load(['member1', 'member2']);
+            $response = $game->fresh()->load(['member1.club', 'member2.club']);
             
             if ($rankingUpdate && $rankingUpdate['success']) {
                 $response->ranking_update = $rankingUpdate;
