@@ -49,7 +49,7 @@ class MemberController extends Controller
     public function update(Request $request, Member $member): JsonResponse
     {
         $request->validate([
-            'name' => 'required|string|max:255',
+            'name' => 'sometimes|required|string|max:255',
             'ranking' => 'nullable|integer',
             'age' => 'nullable|integer',
             'cedula' => 'nullable|string|max:255',

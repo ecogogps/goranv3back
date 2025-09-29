@@ -7,11 +7,17 @@ use App\Http\Controllers\Api\MemberController;
 use App\Http\Controllers\Api\GameController;
 use App\Http\Controllers\Api\ClubController;
 
+Route::apiResource('deportes', DeporteController::class);
+
+Route::apiResource('ligas', LigaController::class);
+
 Route::apiResource('clubs', ClubController::class);
 
 Route::post('/tournaments', [TournamentController::class, 'store']);
 
 Route::get('/tournaments', [TournamentController::class, 'index']);
+
+Route::delete('/tournaments/{tournament}', [TournamentController::class, 'destroy']);
 
 
 Route::post('/tournaments/{tournament}/generate-bracket', [BracketController::class, 'generateBracket']);

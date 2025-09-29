@@ -105,13 +105,13 @@ class BracketController extends Controller
         // Transformar los datos para incluir las URLs de las imágenes de los clubes
         $games->transform(function ($game) {
             if ($game->member1 && $game->member1->club && $game->member1->club->imagen) {
-                $game->member1->club->imagen_url = 'https://00591b4e804e.ngrok-free.app/storage/' . $game->member1->club->imagen;
+                $game->member1->club->imagen_url = 'https://8d4e1417523b.ngrok-free.app/storage/' . $game->member1->club->imagen;
             } else if ($game->member1 && $game->member1->club) {
                 $game->member1->club->imagen_url = null;
             }
             
             if ($game->member2 && $game->member2->club && $game->member2->club->imagen) {
-                $game->member2->club->imagen_url = 'https://00591b4e804e.ngrok-free.app/storage/' . $game->member2->club->imagen;
+                $game->member2->club->imagen_url = 'https://8d4e1417523b.ngrok-free.app/storage/' . $game->member2->club->imagen;
             } else if ($game->member2 && $game->member2->club) {
                 $game->member2->club->imagen_url = null;
             }
@@ -152,7 +152,7 @@ class BracketController extends Controller
                 'club' => $member->club ? [
                     'id' => $member->club->id,
                     'nombre' => $member->club->nombre,
-                    'imagen_url' => $member->club->imagen ? 'https://00591b4e804e.ngrok-free.app/storage/' . $member->club->imagen : null
+                    'imagen_url' => $member->club->imagen ? 'https://8d4e1417523b.ngrok-free.app/storage/' . $member->club->imagen : null
                 ] : null
             ];
         });

@@ -1,5 +1,6 @@
 <?php
 
+// app/Models/Club.php
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -11,11 +12,17 @@ class Club extends Model
     
     protected $fillable = [
         'nombre',
-        'imagen'
+        'imagen',
+        'liga_id'
     ];
 
     public function members()
     {
         return $this->hasMany(Member::class);
+    }
+
+    public function liga()
+    {
+        return $this->belongsTo(Liga::class);
     }
 }

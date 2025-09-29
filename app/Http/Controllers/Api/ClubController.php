@@ -12,12 +12,12 @@ class ClubController extends Controller
 {
     public function index(): JsonResponse
     {
-        $clubs = Club::orderBy('nombre')->get();
+        $clubs = Club::with('liga')->withCount('members')->orderBy('nombre')->get();
         
         $clubs->transform(function ($club) {
             if ($club->imagen) {
                 // Corrected URL generation to point directly to the public storage path
-                $club->imagen_url = 'https://00591b4e804e.ngrok-free.app/storage/' . $club->imagen;
+                $club->imagen_url = 'https://8d4e1417523b.ngrok-free.app/storage/' . $club->imagen;
             } else {
                 $club->imagen_url = null;
             }
@@ -47,7 +47,7 @@ class ClubController extends Controller
         // Agregar URL de imagen para la respuesta
         if ($club->imagen) {
             // Corrected URL generation
-            $club->imagen_url = 'https://00591b4e804e.ngrok-free.app/storage/' . $club->imagen;
+            $club->imagen_url = 'https://8d4e1417523b.ngrok-free.app/storage/' . $club->imagen;
         } else {
             $club->imagen_url = null;
         }
@@ -57,12 +57,12 @@ class ClubController extends Controller
 
     public function show(Club $club): JsonResponse
     {
-        $club->load('members');
+        $club->load('members', 'liga');
         
         // Agregar URL de imagen
         if ($club->imagen) {
             // Corrected URL generation
-            $club->imagen_url = 'https://00591b4e804e.ngrok-free.app/storage/' . $club->imagen;
+            $club->imagen_url = 'https://8d4e1417523b.ngrok-free.app/storage/' . $club->imagen;
         } else {
             $club->imagen_url = null;
         }
@@ -94,7 +94,7 @@ class ClubController extends Controller
         // Agregar URL de imagen para la respuesta
         if ($club->imagen) {
             // Corrected URL generation
-            $club->imagen_url = 'https://00591b4e804e.ngrok-free.app/storage/' . $club->imagen;
+            $club->imagen_url = 'https://8d4e1417523b.ngrok-free.app/storage/' . $club->imagen;
         } else {
             $club->imagen_url = null;
         }

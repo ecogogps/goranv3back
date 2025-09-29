@@ -12,12 +12,12 @@ class TournamentController extends Controller
 {
     public function index()
     {
-        $tournaments = Tournament::withCount('games')->get(); 
+        $tournaments = Tournament::withCount(['games', 'members'])->orderBy('created_at', 'desc')->get();
         
         // Transformar la ruta relativa de la imagen en URL completa
         $tournaments->transform(function ($tournament) {
             if ($tournament->main_image_path) {
-                $tournament->main_image_url = 'https://00591b4e804e.ngrok-free.app' . Storage::url($tournament->main_image_path);
+                $tournament->main_image_url = 'https://8d4e1417523b.ngrok-free.app' . Storage::url($tournament->main_image_path);
             } else {
                 $tournament->main_image_url = null;
             }
@@ -111,5 +111,28 @@ class TournamentController extends Controller
             'message' => '¡Torneo creado con éxito!',
             'data' => $tournament
         ], 201);
+    }
+
+    public function destroy(Tournament $tournament)
+    {
+        try {
+            // Eliminar la imagen asociada si existe
+            if ($tournament->main_image_path && Storage::disk('public')->exists($tournament->main_image_path)) {
+                Storage::disk('public')->delete($tournament->main_image_path);
+            }
+
+            // Eliminar el torneo (esto también eliminará las relaciones si están configuradas con cascade)
+            $tournament->delete();
+
+            return response()->json([
+                'message' => 'Torneo eliminado con éxito'
+            ], 200);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'Error al eliminar el torneo',
+                'error' => $e->getMessage()
+            ], 500);
+        }
     }
 }
