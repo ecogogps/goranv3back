@@ -7,17 +7,19 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Auth;
+use App\Models\Member;
 
 class TournamentController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        $tournaments = Tournament::withCount(['games', 'members'])->orderBy('created_at', 'desc')->get();
+        $tournaments = Tournament::withCount(['games', 'members'])->with('members:id')->orderBy('created_at', 'desc')->get();
         
         // Transformar la ruta relativa de la imagen en URL completa
         $tournaments->transform(function ($tournament) {
             if ($tournament->main_image_path) {
-                $tournament->main_image_url = 'https://8d4e1417523b.ngrok-free.app' . Storage::url($tournament->main_image_path);
+                $tournament->main_image_url = 'https://trollopy-ephraim-hypoxanthic.ngrok-free.dev' . Storage::url($tournament->main_image_path);
             } else {
                 $tournament->main_image_url = null;
             }
@@ -111,6 +113,34 @@ class TournamentController extends Controller
             'message' => '¡Torneo creado con éxito!',
             'data' => $tournament
         ], 201);
+    }
+
+    public function registerMember(Request $request, Tournament $tournament)
+    {
+        $validator = Validator::make($request->all(), [
+            'member_id' => 'required|exists:members,id',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json($validator->errors(), 422);
+        }
+
+        $memberId = $request->input('member_id');
+
+        // Verificar si el torneo está lleno
+        if ($tournament->members()->count() >= $tournament->participants_number) {
+            return response()->json(['message' => 'El torneo ya ha alcanzado el número máximo de participantes.'], 409);
+        }
+
+        // Verificar si el miembro ya está inscrito
+        if ($tournament->members()->where('member_id', $memberId)->exists()) {
+            return response()->json(['message' => 'Este miembro ya está inscrito en el torneo.'], 409);
+        }
+
+        // Inscribir al miembro
+        $tournament->members()->attach($memberId);
+
+        return response()->json(['message' => 'Inscripción exitosa.'], 200);
     }
 
     public function destroy(Tournament $tournament)

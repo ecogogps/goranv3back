@@ -1,11 +1,15 @@
 ./ngrok http 8000
+./ngrok http --domain=trollopy-ephraim-hypoxanthic.ngrok-free.dev 8000
+
 
 INSERT INTO tournament_registrations (tournament_id, member_id, created_at) VALUES
-(125, 1, '2025-09-23 09:15:00'), -- Carlos Rodriguez
-(125, 2, '2025-09-23 09:30:00'), -- Juan Pérez
-(125, 3, '2025-09-23 09:45:00'), -- Luis Gómez
-(125, 4, '2025-09-23 10:00:00'), -- Miguel Sánchez
-(125, 5, '2025-09-23 10:15:00'), -- Andrés Herrera
-(125, 6, '2025-09-23 10:30:00'), -- José Ramírez
-(125, 7, '2025-09-23 10:45:00'), -- Diego Torres
-(125, 8, '2025-09-23 11:00:00'); -- Fernando Castillo
+(172, 1, '2025-09-30 09:15:00'), -- Carlos Rodriguez
+(172, 2, '2025-09-30 09:30:00'), -- Juan Pérez
+(172, 3, '2025-09-30 09:45:00'), -- Luis Gómez
+(172, 4, '2025-09-30 10:00:00'), -- Miguel Sánchez
+(172, 5, '2025-09-30 10:15:00'), -- Andrés Herrera
+(172, 6, '2025-09-30 10:30:00'), -- José Ramírez
+(172, 7, '2025-09-30 10:45:00'), -- Diego Torres
+(172, 8, '2025-09-30 11:00:00'); -- Fernando Castillo
+
+Falta hacer: validaciones impares

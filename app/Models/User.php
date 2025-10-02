@@ -6,30 +6,29 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
-use Laravel\Sanctum\HasApiTokens; // Importar HasApiTokens para Sanctum
+use Laravel\Sanctum\HasApiTokens;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class User extends Authenticatable
 {
-    /** @use HasFactory<\Database\Factories\UserFactory> */
-    use HasFactory, Notifiable, HasApiTokens; // Añadir HasApiTokens
+    use HasApiTokens, HasFactory, Notifiable;
 
     /**
      * The attributes that are mass assignable.
      *
-     * @var list<string>
+     * @var array<int, string>
      */
     protected $fillable = [
-        'name',
         'email',
         'password',
         'role',
-        'client_id',
+        'is_active',
     ];
 
     /**
      * The attributes that should be hidden for serialization.
      *
-     * @var list<string>
+     * @var array<int, string>
      */
     protected $hidden = [
         'password',
@@ -37,39 +36,55 @@ class User extends Authenticatable
     ];
 
     /**
-     * Get the attributes that should be cast.
+     * The attributes that should be cast.
      *
-     * @return array<string, string>
+     * @var array<string, string>
      */
-    protected function casts(): array
+    protected $casts = [
+        'email_verified_at' => 'datetime',
+        'password' => 'hashed',
+        'is_active' => 'boolean',
+    ];
+
+    /**
+     * Get the profile associated with the user (Liga, Club, or Member).
+     * This uses an accessor to dynamically get the correct profile relationship.
+     */
+    public function getProfileAttribute()
     {
-        return [
-            'email_verified_at' => 'datetime',
-            'password' => 'hashed',
-        ];
+        // The relationship name is the role in lowercase
+        $relationship = strtolower($this->role);
+
+        // Check if the relationship method exists to avoid errors
+        if (method_exists($this, $relationship)) {
+            return $this->{$relationship};
+        }
+        
+        return null;
     }
 
     /**
-     * Get the client associated with the user.
+     * Define the one-to-one relationship with Liga.
      */
-    public function client()
+    public function liga(): HasOne
     {
-        return $this->belongsTo(Client::class);
+        return $this->hasOne(Liga::class);
     }
 
     /**
-     * Check if the user is an administrator.
+     * Define the one-to-one relationship with Club.
      */
-    public function isAdmin(): bool
+    public function club(): HasOne
     {
-        return $this->role === 'admin';
+        return $this->hasOne(Club::class);
     }
 
     /**
-     * Check if the user is a client.
+     * Define the one-to-one relationship with Member.
      */
-    public function isClient(): bool
+    public function miembro(): HasOne
     {
-        return $this->role === 'client';
+        return $this->hasOne(Member::class);
     }
 }
+

@@ -18,4 +18,9 @@ class Deporte extends Model
     protected $hidden = [];
 
     protected $casts = [];
+
+    public function ligas()
+    {
+        return $this->hasMany(Liga::class);
+    }
 }

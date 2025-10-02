@@ -1,6 +1,5 @@
 <?php
 
-// app/Models/Member.php
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -20,8 +19,9 @@ class Member extends Model
         'pais',
         'provincia',
         'ciudad',
-        'email',
+        'celular',
         'club_id',
+        'user_id', 
         'drive_marca',
         'drive_modelo',
         'drive_tipo',
@@ -37,6 +37,11 @@ class Member extends Model
     public function tournaments()
     {
         return $this->belongsToMany(Tournament::class, 'tournament_registrations');
+    }
+
+    public function user()
+    {
+        return $this->belongsTo(User::class);
     }
 
     public function club()

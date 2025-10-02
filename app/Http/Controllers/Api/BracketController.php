@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Tournament;
+use App\Models\RankingHistory;
 use App\Models\Game;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -105,13 +106,13 @@ class BracketController extends Controller
         // Transformar los datos para incluir las URLs de las imágenes de los clubes
         $games->transform(function ($game) {
             if ($game->member1 && $game->member1->club && $game->member1->club->imagen) {
-                $game->member1->club->imagen_url = 'https://8d4e1417523b.ngrok-free.app/storage/' . $game->member1->club->imagen;
+                $game->member1->club->imagen_url = 'https://trollopy-ephraim-hypoxanthic.ngrok-free.dev/storage/' . $game->member1->club->imagen;
             } else if ($game->member1 && $game->member1->club) {
                 $game->member1->club->imagen_url = null;
             }
             
             if ($game->member2 && $game->member2->club && $game->member2->club->imagen) {
-                $game->member2->club->imagen_url = 'https://8d4e1417523b.ngrok-free.app/storage/' . $game->member2->club->imagen;
+                $game->member2->club->imagen_url = 'https://trollopy-ephraim-hypoxanthic.ngrok-free.dev/storage/' . $game->member2->club->imagen;
             } else if ($game->member2 && $game->member2->club) {
                 $game->member2->club->imagen_url = null;
             }
@@ -129,15 +130,13 @@ class BracketController extends Controller
     public function getStandings(Tournament $tournament)
     {
         $allGames = $tournament->games()->with('member1.club', 'member2.club')->get();
-
-        
+    
         $allGamesCompleted = $allGames->every(fn($game) => $game->status === 'completed');
-
+    
         if (!$allGamesCompleted) {
             return response()->json(['message' => 'El torneo aún no ha finalizado. Complete todos los partidos para ver la tabla de posiciones.'], 400);
         }
-
-        
+    
         $standings = [];
         $allGames->pluck('member1')->merge($allGames->pluck('member2'))->unique('id')->filter()->each(function ($member) use (&$standings) {
             $standings[$member->id] = [
@@ -152,44 +151,64 @@ class BracketController extends Controller
                 'club' => $member->club ? [
                     'id' => $member->club->id,
                     'nombre' => $member->club->nombre,
-                    'imagen_url' => $member->club->imagen ? 'https://8d4e1417523b.ngrok-free.app/storage/' . $member->club->imagen : null
+                    'imagen_url' => $member->club->imagen ? 'https://trollopy-ephraim-hypoxanthic.ngrok-free.dev/storage/' . $member->club->imagen : null
                 ] : null
             ];
         });
-
-        
+    
         foreach ($allGames as $game) {
             if (!$game->member1_id || !$game->member2_id) continue;
-
+    
             $member1Id = $game->member1_id;
             $member2Id = $game->member2_id;
             
             $standings[$member1Id]['games_played']++;
             $standings[$member2Id]['games_played']++;
-
-            if ($game->winner_id === null) { // EMPATE
+    
+            if ($game->winner_id === null) {
                 $standings[$member1Id]['points'] += 1;
                 $standings[$member2Id]['points'] += 1;
                 $standings[$member1Id]['draws']++;
                 $standings[$member2Id]['draws']++;
-            } else { // HAY UN GANADOR
+            } else {
                 $winnerId = $game->winner_id;
                 $loserId = ($winnerId == $member1Id) ? $member2Id : $member1Id;
-
+    
                 $standings[$winnerId]['points'] += 3;
                 $standings[$winnerId]['wins']++;
-                // Al perdedor no se le suman puntos (0)
                 $standings[$loserId]['losses']++;
             }
         }
-
-        
+    
+        // ✅ AGREGAR CAMBIO DE RANKING DEL TORNEO
+        foreach ($standings as $memberId => &$standing) {
+            $firstRanking = \App\Models\RankingHistory::forMember($memberId)
+                ->where('tournament_id', $tournament->id)
+                ->oldest()
+                ->first();
+                
+            $lastRanking = \App\Models\RankingHistory::forMember($memberId)
+                ->where('tournament_id', $tournament->id)
+                ->latest()
+                ->first();
+            
+            if ($firstRanking && $lastRanking) {
+                $standing['ranking_change'] = $lastRanking->ranking - $firstRanking->previous_ranking;
+                $standing['initial_ranking'] = $firstRanking->previous_ranking;
+                $standing['final_ranking'] = $lastRanking->ranking;
+            } else {
+                $standing['ranking_change'] = null;
+                $standing['initial_ranking'] = $standing['ranking'];
+                $standing['final_ranking'] = $standing['ranking'];
+            }
+        }
+    
         usort($standings, function($a, $b) {
             if ($b['points'] !== $a['points']) return $b['points'] - $a['points'];
             if ($b['wins'] !== $a['wins']) return $b['wins'] - $a['wins'];
             return $a['losses'] - $b['losses'];
         });
-
+    
         return response()->json(array_values($standings));
     }
 

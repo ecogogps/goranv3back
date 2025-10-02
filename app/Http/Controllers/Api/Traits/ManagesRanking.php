@@ -3,15 +3,11 @@
 namespace App\Http\Controllers\Api\Traits;
 
 use App\Models\Member;
+use App\Models\RankingHistory;
 use Illuminate\Support\Facades\Log;
 
 trait ManagesRanking
 {
-    /**
-     * Tabla de puntos de intercambio basada en la diferencia de ranking
-     * 
-     * @return array
-     */
     private function getExchangePointsTable()
     {
         return [
@@ -29,17 +25,9 @@ trait ManagesRanking
         ];
     }
 
-    /**
-     * Calcula y actualiza los rankings de los jugadores después de un partido
-     * 
-     * @param int $winnerId ID del jugador ganador
-     * @param int $loserId ID del jugador perdedor
-     * @return array Información sobre la actualización de ranking
-     */
-    public function updatePlayersRanking($winnerId, $loserId)
+    public function updatePlayersRanking($winnerId, $loserId, $gameId = null, $tournamentId = null)
     {
         try {
-            
             $winner = Member::find($winnerId);
             $loser = Member::find($loserId);
 
@@ -54,31 +42,42 @@ trait ManagesRanking
                 ];
             }
 
-            
             $winnerRanking = $winner->ranking ?? 1000;
             $loserRanking = $loser->ranking ?? 1000;
-
-            
             $rankingDifference = abs($winnerRanking - $loserRanking);
-
-            
-            $higherRankedPlayer = $winnerRanking >= $loserRanking ? 'winner' : 'loser';
-
-            
             $isExpectedResult = ($winnerRanking >= $loserRanking);
-
-            
             $exchangePoints = $this->getExchangePointsForDifference($rankingDifference, $isExpectedResult);
 
-            
             $newWinnerRanking = $winnerRanking + $exchangePoints;
             $newLoserRanking = $loserRanking - $exchangePoints;
 
-            
+            // Actualizar rankings
             $winner->update(['ranking' => $newWinnerRanking]);
             $loser->update(['ranking' => $newLoserRanking]);
 
-            Log::info("Rankings actualizados", [
+            // ✅ GUARDAR EN HISTORIAL - GANADOR
+            RankingHistory::create([
+                'member_id' => $winnerId,
+                'ranking' => $newWinnerRanking,
+                'previous_ranking' => $winnerRanking,
+                'change' => $exchangePoints, // Positivo
+                'game_id' => $gameId,
+                'tournament_id' => $tournamentId,
+                'reason' => 'game_result'
+            ]);
+
+            // ✅ GUARDAR EN HISTORIAL - PERDEDOR
+            RankingHistory::create([
+                'member_id' => $loserId,
+                'ranking' => $newLoserRanking,
+                'previous_ranking' => $loserRanking,
+                'change' => -$exchangePoints, // Negativo
+                'game_id' => $gameId,
+                'tournament_id' => $tournamentId,
+                'reason' => 'game_result'
+            ]);
+
+            Log::info("Rankings actualizados y guardados en historial", [
                 'winner' => [
                     'id' => $winnerId,
                     'name' => $winner->name,
@@ -92,10 +91,7 @@ trait ManagesRanking
                     'old_ranking' => $loserRanking,
                     'new_ranking' => $newLoserRanking,
                     'change' => -$exchangePoints
-                ],
-                'difference' => $rankingDifference,
-                'expected_result' => $isExpectedResult,
-                'exchange_points' => $exchangePoints
+                ]
             ]);
 
             return [
@@ -134,13 +130,6 @@ trait ManagesRanking
         }
     }
 
-    /**
-     * Obtiene los puntos de intercambio según la diferencia de ranking
-     * 
-     * @param int $difference Diferencia absoluta entre rankings
-     * @param bool $isExpectedResult Si el resultado fue esperado o no
-     * @return int Puntos a intercambiar
-     */
     private function getExchangePointsForDifference($difference, $isExpectedResult)
     {
         $table = $this->getExchangePointsTable();
@@ -151,72 +140,49 @@ trait ManagesRanking
             }
         }
 
-        
         return $isExpectedResult ? 0 : 50;
     }
 
-    /**
-     * Verifica si un torneo afecta el ranking
-     * 
-     * @param \App\Models\Tournament $tournament
-     * @return bool
-     */
     public function tournamentAffectsRanking($tournament)
     {
-        
-        
         return $tournament && 
                isset($tournament->affects_ranking) && 
                (bool) $tournament->affects_ranking;
     }
 
-    /**
-     * Procesa la actualización de ranking para un partido completado
-     * Solo procesa si:
-     * - El torneo afecta el ranking
-     * - El partido tiene un ganador definido (no es empate)
-     * - Ambos jugadores existen
-     * 
-     * @param \App\Models\Game $game
-     * @return array|null Resultado de la actualización o null si no se procesó
-     */
     public function processGameRankingUpdate($game)
     {
-        
         if ($game->status !== 'completed' || !$game->winner_id) {
             return null;
         }
 
-        
         if (!$this->tournamentAffectsRanking($game->tournament)) {
             return null;
         }
 
-        
         $winnerId = $game->winner_id;
         $loserId = ($game->member1_id === $winnerId) ? $game->member2_id : $game->member1_id;
 
-        
         if (!$winnerId || !$loserId) {
             return null;
         }
 
-        
-        return $this->updatePlayersRanking($winnerId, $loserId);
+        // ✅ Pasar game_id y tournament_id al historial
+        return $this->updatePlayersRanking(
+            $winnerId, 
+            $loserId, 
+            $game->id, 
+            $game->tournament_id
+        );
     }
 
-    /**
-     * Obtiene un resumen de la tabla de puntos de intercambio para debugging
-     * 
-     * @return array
-     */
     public function getRankingSystemSummary()
     {
         return [
             'system_name' => 'USA Table Tennis Simplified System',
             'default_ranking' => 1000,
             'exchange_table' => $this->getExchangePointsTable(),
-            'description' => 'Sistema basado en diferencia de rankings donde el ganador gana puntos y el perdedor los pierde. Los puntos intercambiados dependen de la diferencia inicial y si el resultado fue esperado o inesperado.'
+            'description' => 'Sistema basado en diferencia de rankings donde el ganador gana puntos y el perdedor los pierde.'
         ];
     }
 }
